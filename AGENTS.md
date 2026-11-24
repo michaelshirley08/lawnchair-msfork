@@ -17,10 +17,34 @@ More detail: `docs/ARCHITECTURE.md`, `docs/DEVELOPMENT.md`,
 Variants are `lawn` + `WithQuickstep` + channel (`Github`, `Nightly`, `Play`) + `Debug`/`Release`.
 ```bash
 ./gradlew assembleLawnWithQuickstepGithubDebug   # build debug APK (CI also builds PlayDebug and NightlyRelease)
+./gradlew installLawnWithQuickstepGithubDebug    # install on a connected device
 ./gradlew spotlessCheck                          # formatting check, run by CI
 ./gradlew spotlessApply                          # fix formatting
+./gradlew lintLawnWithQuickstepGithubDebug       # Android lint (accepted findings in lint-baseline.xml)
 ```
 Output APK: `build/outputs/apk/**/Lawnchair.<version>.<channel>.<buildType>.apk`.
+There is no working single-test command yet (see Testing).
+
+## Architecture
+- Launcher3, Quickstep and Lawnchair are **source sets of one module**, not separate Gradle
+  modules (root `build.gradle`, `sourceSets` block): `main` = `src`, `src_plugins`, `compose/*`;
+  `lawn` = `lawnchair/src`, `src_flags`, `src_shortcuts_overrides`, `tests/shared`;
+  `withQuickstep` = `quickstep/src`, `quickstep/dagger`, `quickstep/recents_ui_overrides/src`.
+  Flavor dimensions are `app` × `recents` × `channel`; package IDs `app.lawnchair`,
+  `app.lawnchair.nightly`, `app.lawnchair.play`.
+- Entry points: `LawnchairApp` (Application, init of prefs/root helper/`LawnchairProcessInitializer`)
+  and `LawnchairLauncher extends QuickstepLauncher`, which wires Lawnchair gestures, popups,
+  theming, feed overlay and sleep. Settings UI is Compose, hosted by `ui/preferences/PreferenceActivity`.
+- Two preference layers: legacy `PreferenceManager` (SharedPreferences, still read by View code)
+  and `PreferenceManager2` (DataStore + Flow; use `firstCached()` for synchronous reads, never
+  block the main thread on the flow). `IdpPreference` grid values feed `InvariantDeviceProfile`;
+  changing them goes through `ReloadHelper` / `DeviceProfileOverrides` to reload the launcher.
+- Two databases: AOSP `launcher.db` (workspace model, loaded via `LauncherModel` /
+  `Executors.MODEL_EXECUTOR`) and Lawnchair's Room `AppDatabase` (folders/Lawndeck, icon overrides,
+  wallpaper). Backup (`backup/LawnchairBackup`) zips both plus prefs.
+- All-apps search: `LawnchairSearchAlgorithm` picks ASI, Local or App-only from the
+  `searchAlgorithm` pref; providers live in `search/algorithms/engine/provider`.
+  Search-bar (QSB) web providers are separate, in `qsb/providers`.
 
 ## Where changes go
 - New feature: a package under `lawnchair/src/app/lawnchair/`.
