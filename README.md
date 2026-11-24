@@ -97,6 +97,75 @@ A huge thank you to our Core Backers ($5+):
 
 Visit the [Lawnchair contributing guidelines](CONTRIBUTING.md) for information and tips on contributing to Lawnchair.
 
+## Codebase guide (for developers and AI agents)
+
+This section is a map of the repository. It is kept compact; details live in `docs/`.
+
+**What it is:** Lawnchair's own code (Kotlin, Jetpack Compose) sits in `lawnchair/src/app/lawnchair/` on top of AOSP Launcher3 (`src/`), Quickstep/Recents (`quickstep/`), SystemUI (`systemUI/`) and WM Shell (`wmshell/`). Most of the repository is upstream AOSP code. It all builds as a **single Gradle app module**; `lawnchair/`, `src/` and `quickstep/` are source sets wired in the root `build.gradle`, not separate modules.
+
+### Quick start
+
+```bash
+git submodule update --init --recursive     # required: platform_frameworks_libs_systemui
+./gradlew assembleLawnWithQuickstepGithubDebug
+./gradlew spotlessCheck                     # formatting; also run by CI
+```
+
+Requires JDK 21 and an Android SDK (compileSdk 37). `minSdk` is 26. Build variants combine `lawn` + `WithQuickstep` + a channel (`Github`, `Nightly` or `Play`) + `Debug` or `Release`.
+
+### Repository map
+
+| Path | Contents |
+|---|---|
+| `lawnchair/` | **Lawnchair-specific code**, resources, AIDL, assets and protos |
+| `src/`, `res/`, `quickstep/`, `systemUI/`, `wmshell/` | Upstream AOSP code; keep diffs minimal |
+| `platform_frameworks_libs_systemui/` | Git submodule (icon loader, search UI, animation libs) |
+| `compatLib/` | Per-Android-version API shims (Android 10 to 16) |
+| `flowerpot/` | App-categorization rule format and tooling |
+| `tests/` | Upstream AOSP Launcher3 tests; none cover `app.lawnchair.*` yet |
+| `docs/` | Architecture, development guide and regression test plan (below) |
+| `fastlane/`, `.github/workflows/` | Store metadata and CI |
+
+`Android.bp`, `CleanSpec.mk`, `OWNERS` and `PREUPLOAD.cfg` are AOSP leftovers that the Gradle build does not use.
+
+### Feature map (`lawnchair/src/app/lawnchair/`)
+
+| Feature | Package |
+|---|---|
+| Entry points | `LawnchairApp.kt`, `LawnchairLauncher.kt` |
+| Settings (new, DataStore) / legacy (SharedPreferences) | `preferences2/` / `preferences/`; screens in `ui/preferences/destinations/` |
+| Gestures and sleep modes | `gestures/` |
+| Dock modes | `hotseat/` |
+| Search bar (QSB) and its providers | `qsb/` |
+| All-apps search | `search/` |
+| At a Glance / Smartspacer | `smartspace/` |
+| Icon packs, shapes, themed icons | `icons/`, `theme/` |
+| App-drawer folders | `deck/`, `data/folder/` |
+| Backup and restore | `backup/` (`.lawnchairbackup` zip) |
+| Root helper | `root/` |
+
+### Conventions
+
+- New settings go in `preferences2/PreferenceManager2.kt`, not the legacy manager.
+- Prefer subclassing or overrides (`override/`, `factory/`) over editing AOSP files; mark unavoidable edits with a `Lawnchair` comment.
+- Formatting is enforced by Spotless: Java everywhere, Kotlin only under `lawnchair/src/**`.
+- English strings only in `values/`; Crowdin manages translations.
+- Commit and PR titles use Conventional Commits (`fix:`, `feat(scope):`, `chore(deps):`).
+- CI runs on pushes to `*-dev` branches and on PRs, and ignores Markdown-only changes.
+
+### Runtime gating to keep in mind
+
+Some features depend on the device: ASI search needs API 31+ with Quickstep enabled; Google dock and smartspace modes need the Google app; QuickSwitch and root sleep need root; the Play flavor restricts some features. Code must handle the "unavailable" case without crashing.
+
+### More documentation
+
+- [`AGENTS.md`](AGENTS.md) / [`CLAUDE.md`](CLAUDE.md): short, command-oriented instructions for coding agents.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md): structure, build wiring and feature internals.
+- [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md): build, where to put changes, and a test-automation roadmap.
+- [`docs/testing/REGRESSION_TEST_PLAN.md`](docs/testing/REGRESSION_TEST_PLAN.md): 120 regression cases ([CSV](docs/testing/regression-test-cases.csv)).
+- [`flowerpot/README.md`](flowerpot/README.md): app-category rule format.
+- Official developer docs: <https://docs.lawnchair.app/developers>.
+
 ## Quick links
 
 - [Website](https://lawnchair.app)
